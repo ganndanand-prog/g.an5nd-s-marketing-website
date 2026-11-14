@@ -22,6 +22,7 @@ export interface EmailPayload {
 export interface SendEmailResult {
   success: boolean;
   emailDelivered: boolean;
+  discordDelivered?: boolean;
   emailConfigured: boolean;
   needsActivation?: boolean;
   message: string;
@@ -45,6 +46,7 @@ export const submitRequestToBackend = async (payload: EmailPayload): Promise<Sen
       return {
         success: true,
         emailDelivered: Boolean(data.emailDelivered),
+        discordDelivered: Boolean(data.discordDelivered),
         emailConfigured: Boolean(data.emailConfigured),
         needsActivation: Boolean(data.needsActivation),
         message: data.message || 'Амжилттай бүртгэгдлээ!',

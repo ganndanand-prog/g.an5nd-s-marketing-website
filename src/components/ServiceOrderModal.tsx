@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { X, Send, CheckCircle2, AlertCircle, Loader2, Briefcase } from 'lucide-react';
-import { sendToDiscordWebhook } from '../utils/discordWebhook';
 import { submitRequestToBackend, EmailPayload } from '../utils/emailSender';
 import { saveSubmission, upsertSubmissionInCache } from '../utils/submissionsStorage';
 
@@ -64,24 +63,11 @@ export const ServiceOrderModal: React.FC<ServiceOrderModalProps> = ({
     };
 
     try {
-      const [discordResult, backendResult] = await Promise.allSettled([
-        sendToDiscordWebhook({
-          title: 'Шинэ захиалга',
-          name: trimmedName,
-          contact: trimmedContact,
-          service: trimmedService,
-          message: trimmedMessage,
-        }),
-        submitRequestToBackend(emailPayload),
-      ]);
+      const result = await submitRequestToBackend(emailPayload);
 
-      const discordSucceeded = discordResult.status === 'fulfilled' && discordResult.value === true;
-      const backendSucceeded =
-        backendResult.status === 'fulfilled' && backendResult.value.success;
-
-      if (backendResult.status === 'fulfilled' && backendResult.value.success) {
-        if (backendResult.value.submission) {
-          upsertSubmissionInCache(backendResult.value.submission);
+      if (result.success) {
+        if (result.submission) {
+          upsertSubmissionInCache(result.submission);
         } else {
           saveSubmission({
             type: trimmedService ? 'service' : 'contact',
@@ -90,12 +76,10 @@ export const ServiceOrderModal: React.FC<ServiceOrderModalProps> = ({
             phone: emailPayload.phone || trimmedContact,
             service: trimmedService || undefined,
             message: emailPayload.message,
-            emailDelivered: backendResult.value.emailDelivered,
+            emailDelivered: result.emailDelivered,
           });
         }
-      }
 
-      if (discordSucceeded || backendSucceeded) {
         setStatusType('success');
         setStatusMessage('Баярлалаа! Удахгүй холбогдоно.');
         setName('');

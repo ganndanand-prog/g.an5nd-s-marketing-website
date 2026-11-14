@@ -162,6 +162,57 @@ const getPublicSiteUrl = (): string => {
   return 'https://comforting-chebakia-654408.netlify.app';
 };
 
+const trySendDiscordWebhook = async (
+  record: SubmissionRecord,
+  typeTitle: string
+): Promise<boolean> => {
+  const webhookUrl = (process.env.DISCORD_WEBHOOK_URL || '').trim();
+  if (!webhookUrl) {
+    return false;
+  }
+
+  try {
+    const contactVal =
+      record.phone && record.email && record.phone !== record.email
+        ? `${record.phone} / ${record.email}`
+        : record.phone || record.email;
+
+    const serviceVal =
+      record.service ||
+      (record.collabType
+        ? `${record.collabType}${record.category ? ` (${record.category})` : ''}`
+        : typeTitle);
+
+    const lines = [
+      record.type === 'service' ? 'Шинэ захиалга' : `Шинэ захиалга (${typeTitle})`,
+      `Нэр: ${record.brandName ? `${record.brandName} — ${record.senderName}` : record.senderName}`,
+      `Холбоо барих: ${contactVal}`,
+      `Үйлчилгээ: ${serviceVal}`,
+      `Мессеж: ${record.message}`,
+    ];
+
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        content: lines.join('\n'),
+        allowed_mentions: { parse: [] },
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('Discord webhook delivery failed:', response.status);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error('Discord webhook error:', error);
+    return false;
+  }
+};
+
 const trySendEmail = async (
   record: SubmissionRecord,
   subject: string,
@@ -172,7 +223,7 @@ const trySendEmail = async (
 
   // 1. Direct Gmail SMTP or Custom SMTP via Nodemailer
   const gmailUser = (process.env.GMAIL_USER || '').trim();
-  const gmailPass = (process.env.GMAIL_APP_PASSWORD || '').trim();
+  const gmailPass = (process.env.GMAIL_APP_PASSWORD || '').replace(/\s+/g, '');
   const smtpHost = (process.env.SMTP_HOST || '').trim();
   const smtpUser = (process.env.SMTP_USER || '').trim();
   const smtpPass = (process.env.SMTP_PASS || '').trim();
@@ -186,6 +237,9 @@ const trySendEmail = async (
               user: gmailUser || recipient,
               pass: gmailPass,
             },
+            connectionTimeout: 8000,
+            greetingTimeout: 8000,
+            socketTimeout: 10000,
           })
         : nodemailer.createTransport({
             host: smtpHost,
@@ -195,6 +249,9 @@ const trySendEmail = async (
               user: smtpUser,
               pass: smtpPass,
             },
+            connectionTimeout: 8000,
+            greetingTimeout: 8000,
+            socketTimeout: 10000,
           });
 
       await transporter.sendMail({
@@ -420,7 +477,10 @@ const startServer = async (): Promise<void> => {
           ? 'Брэнд & Байгууллагын Хамтын Ажиллагаа'
           : 'Шууд зурвас (Холбоо барих)');
 
-      const delivery = await trySendEmail(newRecord, subject, typeTitle);
+      const [delivery, discordDelivered] = await Promise.all([
+        trySendEmail(newRecord, subject, typeTitle),
+        trySendDiscordWebhook(newRecord, typeTitle),
+      ]);
       newRecord.emailDelivered = delivery.delivered;
 
       const existing = await readSubmissions();
@@ -430,6 +490,7 @@ const startServer = async (): Promise<void> => {
         success: true,
         submission: newRecord,
         emailDelivered: delivery.delivered,
+        discordDelivered,
         emailConfigured: delivery.configured,
         needsActivation: Boolean(delivery.needsActivation),
         message: delivery.delivered

@@ -20,7 +20,6 @@ import {
 import { brandCollabInfo } from '../data/portfolioData';
 import { saveSubmission, upsertSubmissionInCache } from '../utils/submissionsStorage';
 import { submitRequestToBackend, createDirectGmailLink, RECIPIENT_EMAIL, EmailPayload } from '../utils/emailSender';
-import { sendToDiscordWebhook } from '../utils/discordWebhook';
 
 export const MarketingCollabSection: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -72,22 +71,7 @@ export const MarketingCollabSection: React.FC = () => {
       message: formData.message,
     };
 
-    const [result] = await Promise.all([
-      submitRequestToBackend(emailPayload),
-      sendToDiscordWebhook({
-        title: 'Шинэ захиалга (Хамтын ажиллагаа)',
-        name: `${formData.brandName} — ${formData.contactPerson}`,
-        contact: `${formData.phone} / ${formData.email}`,
-        service: `${formData.collabType} (${formData.category})`,
-        message: [
-          formData.message,
-          formData.deadline ? `Дедлайн: ${formData.deadline}` : '',
-          formData.budget ? `Төсөв: ${formData.budget}` : '',
-        ]
-          .filter(Boolean)
-          .join(' | '),
-      }).catch(() => false),
-    ]);
+    const result = await submitRequestToBackend(emailPayload);
 
     if (result.success) {
       if (result.submission) {

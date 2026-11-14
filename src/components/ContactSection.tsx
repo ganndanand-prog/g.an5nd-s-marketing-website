@@ -15,7 +15,6 @@ import {
 import { profileData } from '../data/portfolioData';
 import { saveSubmission, upsertSubmissionInCache } from '../utils/submissionsStorage';
 import { submitRequestToBackend, createDirectGmailLink, RECIPIENT_EMAIL, EmailPayload } from '../utils/emailSender';
-import { sendToDiscordWebhook } from '../utils/discordWebhook';
 
 export const ContactSection: React.FC = () => {
   const [copiedEmail, setCopiedEmail] = useState(false);
@@ -54,16 +53,7 @@ export const ContactSection: React.FC = () => {
       message: formData.message,
     };
 
-    const [result] = await Promise.all([
-      submitRequestToBackend(emailPayload),
-      sendToDiscordWebhook({
-        title: 'Шинэ захиалга (Шууд зурвас)',
-        name: formData.name,
-        contact: `${formData.phone} / ${formData.email}`,
-        service: 'Шууд зурвас',
-        message: formData.message,
-      }).catch(() => false),
-    ]);
+    const result = await submitRequestToBackend(emailPayload);
 
     if (result.success) {
       if (result.submission) {
